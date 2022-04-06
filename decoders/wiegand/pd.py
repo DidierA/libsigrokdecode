@@ -45,10 +45,15 @@ class Decoder(srd.Decoder):
     annotations = (
         ('bit', 'Bit'),
         ('state', 'State'),
+        ('hex', 'Hex'),
+        ('facility-code', 'Facility code'),
+        ('card-code', 'Card code'),
     )
     annotation_rows = (
         ('bits', 'Bits', (0,)),
         ('states', 'Stream states', (1,)),
+        ('hexs', 'Stream hex', (2,)),
+        ('26bits', '26 bits', (3,4)),
     )
 
     def __init__(self):
@@ -68,6 +73,7 @@ class Decoder(srd.Decoder):
         self.es_bit = None
         self._bit = None
         self._bits = []
+        self._bitsamples = []
 
     def start(self):
         'Register output types and verify user supplied decoder values.'
@@ -83,11 +89,17 @@ class Decoder(srd.Decoder):
                 ms_per_sample = 1000 * (1.0 / self.samplerate)
                 ms_per_bit = float(self.options['bitwidth_ms'])
                 self._samples_per_bit = int(max(1, int(ms_per_bit / ms_per_sample)))
+    
+    def _26bit_decode(self,bits):
+        facility_code=int(bits[1:9],2)
+        card_code=int(bits[9:25],2)
+        return (facility_code, card_code)
 
     def _update_state(self, state, bit=None):
         'Update state and bit values when they change.'
         if self._bit is not None:
             self._bits.append(self._bit)
+            self._bitsamples.append(self.ss_bit)
             self.put(self.ss_bit, self.samplenum, self.out_ann,
                      [0, [str(self._bit)]])
         self._bit = bit
@@ -104,6 +116,12 @@ class Decoder(srd.Decoder):
                 accum_bits = ''.join(str(x) for x in self._bits)
                 ann = [1, ['%d bits %s' % (len(self._bits), accum_bits),
                            '%d bits' % len(self._bits)]]
+                self.put(self.ss_state, self.samplenum, self.out_ann, [2, [hex(int(accum_bits,2))[2:]]])
+                if len(self._bits)==26:
+                    (facility_code, card_code) = self._26bit_decode(accum_bits)
+                    self.put(self._bitsamples[1], self._bitsamples[9], self.out_ann, [3, [str(facility_code)]])
+                    self.put(self._bitsamples[9], self._bitsamples[25], self.out_ann, [4, [str(card_code)]])
+
             elif self._state == 'invalid':
                 ann = [1, [self._state]]
             if ann:
@@ -111,6 +129,7 @@ class Decoder(srd.Decoder):
             self.ss_state = self.samplenum
             self._state = state
             self._bits = []
+            self._bitsamples = []
 
     def decode(self):
         if not self.samplerate:
