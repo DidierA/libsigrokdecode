@@ -73,7 +73,7 @@ class Decoder(srd.Decoder):
         self.es_bit = None
         self._bit = None
         self._bits = []
-        self._bitsamples = []
+        self._bitsamples = []   # sample nr of start of each bit (for annotations)
 
     def start(self):
         'Register output types and verify user supplied decoder values.'
@@ -91,8 +91,12 @@ class Decoder(srd.Decoder):
                 self._samples_per_bit = int(max(1, int(ms_per_bit / ms_per_sample)))
     
     def _26bit_decode(self,bits):
+        """extract facility and card code from 26-bit wiegand.
+            Checked with Wiegand calculator here : http://www.ccdesignworks.com/wiegand_calc.htm
+        """
         facility_code=int(bits[1:9],2)
         card_code=int(bits[9:25],2)
+        # We don't check for parity
         return (facility_code, card_code)
 
     def _update_state(self, state, bit=None):
@@ -117,6 +121,7 @@ class Decoder(srd.Decoder):
                 ann = [1, ['%d bits %s' % (len(self._bits), accum_bits),
                            '%d bits' % len(self._bits)]]
                 self.put(self.ss_state, self.samplenum, self.out_ann, [2, [hex(int(accum_bits,2))[2:]]])
+                # decode facility and card codes if there are 26 bits
                 if len(self._bits)==26:
                     (facility_code, card_code) = self._26bit_decode(accum_bits)
                     self.put(self._bitsamples[1], self._bitsamples[9], self.out_ann, [3, [str(facility_code)]])
