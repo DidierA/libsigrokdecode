@@ -28,14 +28,14 @@ class Decoder(srd.Decoder):
     license = 'gplv2+'
     inputs = ['logic']
     outputs = []
-    tags = []
+    tags = [ 'Util']
     channels = (
         {'id': 'd0', 'name': 'D0', 'desc': 'Data 0 line'},
         {'id': 'd1', 'name': 'D1', 'desc': 'Data 1 line'},
     )
     options = (
         {'id': 'logic_function', 'desc': 'Logic function to apply',
-         'default': 'or', 'values': ('and', 'or')},
+         'default': 'or', 'values': ('and', 'or', 'xor')},
     )
     annotations = (
         ('bit', 'Bit'),
@@ -66,8 +66,10 @@ class Decoder(srd.Decoder):
     def combine(self):
         if self.options['logic_function'] == 'and':
             return self.d0_prev & self.d1_prev
-        else:
+        elif self.options['logic_function']== 'or': 
             return self.d0_prev | self.d1_prev
+        else:
+            return self.d0_prev ^ self.d1_prev
 
     def decode(self):
         while True:
